@@ -698,5 +698,10 @@
   "697": "Next DevTools: Can't render in this environment. This is a bug in Next.js",
   "698": "Next DevTools: App Dev Overlay is already mounted. This is a bug in Next.js",
   "699": "Next DevTools: Pages Dev Overlay is already mounted. This is a bug in Next.js",
-  "700": "Failed to persist Chrome DevTools workspace UUID. The Chrome DevTools Workspace needs to be reconnected after the next page reload."
+  "700": "Failed to persist Chrome DevTools workspace UUID. The Chrome DevTools Workspace needs to be reconnected after the next page reload.",
+  "701": "Route %s used %s inside \\`\"use cache\"\\` or \\`unstable_cache\\`. Support for this API inside cache scopes is planned for a future version of Next.js.",
+  "702": "%s must not be used within a client component. Next.js should be preventing it from being included in client components statically, but did not in this case.",
+  "703": "Route %s used %s in Pages Router. This API is only available within App Router.",
+  "704": "\\`unstable_rootParams\\` must not be used within a client component. Next.js should be preventing it from being included in client components statically, but did not in this case.",
+  "705": "Missing workStore in %s"
 }
