@@ -150,7 +150,7 @@ pub struct FunctionMeta {
     /// `get_invalidator` function will panic on calls.
     pub invalidator: bool,
 
-    /// If true, it means the funciton is statically analyzed to be immutable.
+    /// If true, it means the function is statically analyzed to be immutable.
     pub statically_immutable: bool,
 }
 
