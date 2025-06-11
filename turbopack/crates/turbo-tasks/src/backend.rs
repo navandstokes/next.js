@@ -670,6 +670,13 @@ pub trait Backend: Sync + Send {
         turbo_tasks: &dyn TurboTasksBackendApi<Self>,
     ) -> TaskId;
 
+    fn get_or_create_immutable_task(
+        &self,
+        task_type: CachedTaskType,
+        parent_task: TaskId,
+        turbo_tasks: &dyn TurboTasksBackendApi<Self>,
+    ) -> TaskId;
+
     fn get_or_create_transient_task(
         &self,
         task_type: CachedTaskType,

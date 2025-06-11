@@ -267,6 +267,13 @@ impl NativeFunction {
                     transient = true,
                 )
             }
+            TaskPersistence::Immutable => {
+                tracing::trace_span!(
+                    "turbo_tasks::function",
+                    name = self.name.as_str(),
+                    immutable = true,
+                )
+            }
             TaskPersistence::Local => {
                 tracing::trace_span!(
                     "turbo_tasks::function",
@@ -287,6 +294,13 @@ impl NativeFunction {
                     "turbo_tasks::resolve_call",
                     name = self.name.as_str(),
                     transient = true,
+                )
+            }
+            TaskPersistence::Immutable => {
+                tracing::trace_span!(
+                    "turbo_tasks::resolve_call",
+                    name = self.name.as_str(),
+                    immutable = true,
                 )
             }
             TaskPersistence::Local => {

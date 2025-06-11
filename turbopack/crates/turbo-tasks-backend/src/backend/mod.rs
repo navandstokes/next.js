@@ -1190,6 +1190,38 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
         task_id
     }
 
+    fn get_or_create_immutable_task(
+        &self,
+        task_type: CachedTaskType,
+        parent_task: TaskId,
+        turbo_tasks: &dyn TurboTasksBackendApi<TurboTasksBackend<B>>,
+    ) -> TaskId {
+        if let Some(task_id) = self.task_cache.lookup_forward(&task_type) {
+            self.track_cache_hit(&task_type);
+            // TODO(kdy1): Figure out if we need to connect the child.
+            self.connect_child(parent_task, task_id, turbo_tasks);
+            return task_id;
+        }
+
+        self.track_cache_miss(&task_type);
+        let task_type = Arc::new(task_type);
+        let task_id = self.immutable_task_id_factory.get();
+        if let Err(existing_task_id) = self.task_cache.try_insert(task_type, task_id) {
+            // Safety: We just created the id and failed to insert it.
+            unsafe {
+                self.immutable_task_id_factory.reuse(task_id);
+            }
+            // TODO(kdy1): Figure out if we need to connect the child.
+            self.connect_child(parent_task, existing_task_id, turbo_tasks);
+            return existing_task_id;
+        }
+
+        // TODO(kdy1): Figure out if we need to connect the child.
+        self.connect_child(parent_task, task_id, turbo_tasks);
+
+        task_id
+    }
+
     fn get_or_create_transient_task(
         &self,
         task_type: CachedTaskType,
@@ -2594,6 +2626,16 @@ impl<B: BackingStorage> Backend for TurboTasksBackend<B> {
     ) -> TaskId {
         self.0
             .get_or_create_persistent_task(task_type, parent_task, turbo_tasks)
+    }
+
+    fn get_or_create_immutable_task(
+        &self,
+        task_type: CachedTaskType,
+        parent_task: TaskId,
+        turbo_tasks: &dyn TurboTasksBackendApi<Self>,
+    ) -> TaskId {
+        self.0
+            .get_or_create_immutable_task(task_type, parent_task, turbo_tasks)
     }
 
     fn get_or_create_transient_task(

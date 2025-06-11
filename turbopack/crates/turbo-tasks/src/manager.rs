@@ -353,6 +353,9 @@ pub enum TaskPersistence {
     /// converted to non-task functions, but that would break their function signature. This
     /// provides a mechanism for skipping caching without changing the function signature.
     Local,
+
+    /// Tasks that are statically analyzable immutable tasks.
+    Immutable,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -624,6 +627,14 @@ impl<B: Backend + 'static> TurboTasks<B> {
                     self,
                 ))
             }
+            TaskPersistence::Immutable => {
+                let task_type = CachedTaskType { fn_type, this, arg };
+                RawVc::TaskOutput(self.backend.get_or_create_immutable_task(
+                    task_type,
+                    current_task("turbo_function calls"),
+                    self,
+                ))
+            }
         }
     }
 
@@ -639,6 +650,7 @@ impl<B: Backend + 'static> TurboTasks<B> {
         {
             return self.native_call(fn_type, this, arg, persistence);
         }
+
         let task_type = LocalTaskType::ResolveNative { fn_type, this, arg };
         self.schedule_local_task(task_type, persistence)
     }

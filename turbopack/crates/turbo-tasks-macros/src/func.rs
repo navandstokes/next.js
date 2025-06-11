@@ -32,6 +32,8 @@ pub struct TurboFn<'a> {
     operation: bool,
     /// Should this function use `TaskPersistence::LocalCells`?
     local: bool,
+    /// Should this function use `TaskPersistence::Immutable`?
+    immutable: bool,
 }
 
 #[derive(Debug)]
@@ -246,6 +248,7 @@ impl TurboFn<'_> {
             operation: args.operation.is_some(),
             local: args.local.is_some(),
             inline_ident,
+            immutable: args.invalidator.is_none() && orig_signature.asyncness.is_none(),
         })
     }
 
@@ -544,7 +547,11 @@ impl TurboFn<'_> {
     }
 
     pub fn persistence_with_this(&self) -> impl ToTokens {
-        if self.local {
+        if self.immutable {
+            quote! {
+                turbo_tasks::TaskPersistence::Immutable
+            }
+        } else if self.local {
             quote! {
                 turbo_tasks::TaskPersistence::Local
             }
