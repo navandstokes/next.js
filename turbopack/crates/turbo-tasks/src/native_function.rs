@@ -149,6 +149,9 @@ pub struct FunctionMeta {
     /// If true, the function will be allowed to call `get_invalidator` . If this is false, the
     /// `get_invalidator` function will panic on calls.
     pub invalidator: bool,
+
+    /// If true, it means the funciton is statically analyzed to be immutable.
+    pub statically_immutable: bool,
 }
 
 /// A native (rust) turbo-tasks function. It's used internally by
