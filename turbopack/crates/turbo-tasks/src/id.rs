@@ -139,11 +139,17 @@ impl Debug for TaskId {
 }
 
 pub const TRANSIENT_TASK_BIT: u32 = 0x8000_0000;
+pub const IMMUTABLE_TASK_BIT: u32 = 0x4000_0000;
 
 impl TaskId {
     pub fn is_transient(&self) -> bool {
         **self & TRANSIENT_TASK_BIT != 0
     }
+
+    pub fn is_immutable(&self) -> bool {
+        **self & IMMUTABLE_TASK_BIT != 0
+    }
+
     pub fn persistence(&self) -> TaskPersistence {
         // tasks with `TaskPersistence::LocalCells` have no `TaskId`, so we can ignore that case
         if self.is_transient() {

@@ -24,8 +24,9 @@ use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use smallvec::{SmallVec, smallvec};
 use tokio::time::{Duration, Instant};
 use turbo_tasks::{
-    CellId, FunctionId, FxDashMap, KeyValuePair, RawVc, ReadCellOptions, ReadConsistency,
-    SessionId, TRANSIENT_TASK_BIT, TaskId, TraitTypeId, TurboTasksBackendApi, ValueTypeId,
+    CellId, FunctionId, FxDashMap, IMMUTABLE_TASK_BIT, KeyValuePair, RawVc, ReadCellOptions,
+    ReadConsistency, SessionId, TRANSIENT_TASK_BIT, TaskId, TraitTypeId, TurboTasksBackendApi,
+    ValueTypeId,
     backend::{
         Backend, BackendJobId, CachedTaskType, CellContent, TaskExecutionSpec, TransientTaskRoot,
         TransientTaskType, TurboTasksExecutionError, TypedCellContent,
@@ -161,6 +162,7 @@ struct TurboTasksBackendInner<B: BackingStorage> {
     session_id: SessionId,
 
     persisted_task_id_factory: IdFactoryWithReuse<TaskId>,
+    immutable_task_id_factory: IdFactoryWithReuse<TaskId>,
     transient_task_id_factory: IdFactoryWithReuse<TaskId>,
 
     persisted_task_cache_log: Option<TaskCacheLog>,
@@ -233,6 +235,10 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
                 backing_storage
                     .next_free_task_id()
                     .expect("Failed to get task id"),
+                TaskId::try_from(IMMUTABLE_TASK_BIT - 1).unwrap(),
+            ),
+            immutable_task_id_factory: IdFactoryWithReuse::new(
+                TaskId::try_from(IMMUTABLE_TASK_BIT).unwrap(),
                 TaskId::try_from(TRANSIENT_TASK_BIT - 1).unwrap(),
             ),
             transient_task_id_factory: IdFactoryWithReuse::new(

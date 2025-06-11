@@ -94,8 +94,8 @@ pub use completion::{Completion, Completions};
 pub use display::ValueToString;
 pub use effect::{ApplyEffectsContext, Effects, apply_effects, effect, get_effects};
 pub use id::{
-    ExecutionId, FunctionId, LocalTaskId, SessionId, TRANSIENT_TASK_BIT, TaskId, TraitTypeId,
-    ValueTypeId,
+    ExecutionId, FunctionId, IMMUTABLE_TASK_BIT, LocalTaskId, SessionId, TRANSIENT_TASK_BIT,
+    TaskId, TraitTypeId, ValueTypeId,
 };
 pub use invalidation::{
     DynamicEqHash, InvalidationReason, InvalidationReasonKind, InvalidationReasonSet, Invalidator,

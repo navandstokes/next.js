@@ -23,9 +23,9 @@ use tracing::{Instrument, Level, Span, info_span, instrument, trace_span};
 use turbo_tasks_malloc::TurboMalloc;
 
 use crate::{
-    Completion, InvalidationReason, InvalidationReasonSet, OutputContent, ReadCellOptions,
-    ResolvedVc, SharedReference, TaskId, TaskIdSet, ValueTypeId, Vc, VcRead, VcValueTrait,
-    VcValueType,
+    Completion, IMMUTABLE_TASK_BIT, InvalidationReason, InvalidationReasonSet, OutputContent,
+    ReadCellOptions, ResolvedVc, SharedReference, TaskId, TaskIdSet, ValueTypeId, Vc, VcRead,
+    VcValueTrait, VcValueType,
     backend::{
         Backend, CachedTaskType, CellContent, TaskCollectiblesMap, TaskExecutionSpec,
         TransientTaskType, TurboTasksExecutionError, TypedCellContent,
@@ -371,6 +371,7 @@ pub struct TurboTasks<B: Backend + 'static> {
     this: Weak<Self>,
     backend: B,
     task_id_factory: IdFactoryWithReuse<TaskId>,
+    immutable_task_id_factory: IdFactoryWithReuse<TaskId>,
     transient_task_id_factory: IdFactoryWithReuse<TaskId>,
     execution_id_factory: IdFactory<ExecutionId>,
     stopped: AtomicBool,
@@ -488,6 +489,10 @@ impl<B: Backend + 'static> TurboTasks<B> {
     pub fn new(backend: B) -> Arc<Self> {
         let task_id_factory = IdFactoryWithReuse::new(
             TaskId::MIN,
+            TaskId::try_from(IMMUTABLE_TASK_BIT - 1).unwrap(),
+        );
+        let immutable_task_id_factory = IdFactoryWithReuse::new(
+            TaskId::try_from(IMMUTABLE_TASK_BIT).unwrap(),
             TaskId::try_from(TRANSIENT_TASK_BIT - 1).unwrap(),
         );
         let transient_task_id_factory =
@@ -497,6 +502,7 @@ impl<B: Backend + 'static> TurboTasks<B> {
             this: this.clone(),
             backend,
             task_id_factory,
+            immutable_task_id_factory,
             transient_task_id_factory,
             execution_id_factory,
             stopped: AtomicBool::new(false),
