@@ -1193,13 +1193,11 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
     fn get_or_create_immutable_task(
         &self,
         task_type: CachedTaskType,
-        parent_task: TaskId,
-        turbo_tasks: &dyn TurboTasksBackendApi<TurboTasksBackend<B>>,
+        _parent_task: TaskId,
+        _turbo_tasks: &dyn TurboTasksBackendApi<TurboTasksBackend<B>>,
     ) -> TaskId {
         if let Some(task_id) = self.task_cache.lookup_forward(&task_type) {
             self.track_cache_hit(&task_type);
-            // TODO(kdy1): Figure out if we need to connect the child.
-            self.connect_child(parent_task, task_id, turbo_tasks);
             return task_id;
         }
 
@@ -1211,13 +1209,8 @@ impl<B: BackingStorage> TurboTasksBackendInner<B> {
             unsafe {
                 self.immutable_task_id_factory.reuse(task_id);
             }
-            // TODO(kdy1): Figure out if we need to connect the child.
-            self.connect_child(parent_task, existing_task_id, turbo_tasks);
             return existing_task_id;
         }
-
-        // TODO(kdy1): Figure out if we need to connect the child.
-        self.connect_child(parent_task, task_id, turbo_tasks);
 
         task_id
     }
