@@ -53,7 +53,7 @@ use references::esm::UrlRewriteBehavior;
 pub use references::{AnalyzeEcmascriptModuleResult, TURBOPACK_HELPER};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
-use smallvec::SmallVec;
+use smallvec::{SmallVec, smallvec};
 pub use static_code::StaticEcmascriptCode;
 use swc_core::{
     atoms::Atom,
@@ -83,8 +83,8 @@ pub use transform::{
 };
 use turbo_rcstr::{RcStr, rcstr};
 use turbo_tasks::{
-    FxIndexMap, NonLocalValue, ReadRef, ResolvedVc, TaskInput, TryJoinIterExt, ValueToString, Vc,
-    trace::TraceRawVcs,
+    FxIndexMap, NonLocalValue, ReadRef, ResolvedVc, TaskInput, TryFlatJoinIterExt, TryJoinIterExt,
+    ValueToString, Vc, trace::TraceRawVcs,
 };
 use turbo_tasks_fs::{FileJsonContent, FileSystemPath, glob::Glob, rope::Rope};
 use turbopack_core::{
@@ -1221,7 +1221,7 @@ impl EcmascriptModuleContent {
             .try_join()
             .await?;
 
-        let (merged_ast, comments, source_maps) =
+        let (merged_ast, comments, source_maps, original_source_maps) =
             merge_modules(contents, &entries, &globals_merged).await?;
 
         let last_options = module_options.last().unwrap().await?;
@@ -1241,7 +1241,7 @@ impl EcmascriptModuleContent {
             is_esm: true,
             generate_source_map: last_options.generate_source_map,
             // TODO
-            original_source_map: None,
+            original_source_map: original_source_maps,
             minify: *module_options
                 .first()
                 .unwrap()
@@ -1280,6 +1280,7 @@ async fn merge_modules(
     Program,
     Vec<CodeGenResultComments>,
     Vec<CodeGenResultSourceMap>,
+    SmallVec<[ResolvedVc<Box<dyn GenerateSourceMap>>; 1]>,
 )> {
     struct SetSyntaxContextVisitor<'a> {
         header_width: u32,
@@ -1367,6 +1368,28 @@ async fn merge_modules(
             *local_ctxt = global_ctxt; // ctxt.apply_mark(*self.merged_marks.get(&module).unwrap());
         }
         fn visit_mut_span(&mut self, span: &mut Span) {
+            println!(
+                "{:?} {:?} {:?} -> {:?}",
+                self.header_width,
+                self.current_module_idx,
+                span.lo,
+                CodeGenResultComments::encode_bytepos(
+                    self.header_width,
+                    self.current_module_idx,
+                    span.lo,
+                )
+            );
+            println!(
+                "{:?} {:?} {:?} -> {:?}",
+                self.header_width,
+                self.current_module_idx,
+                span.hi,
+                CodeGenResultComments::encode_bytepos(
+                    self.header_width,
+                    self.current_module_idx,
+                    span.hi,
+                )
+            );
             span.lo = CodeGenResultComments::encode_bytepos(
                 self.header_width,
                 self.current_module_idx,
@@ -1508,7 +1531,19 @@ async fn merge_modules(
         .map(|(_, content)| std::mem::take(&mut content.source_map))
         .collect::<Vec<_>>();
 
-    Ok((merged_ast, comments, source_maps))
+    let original_source_maps = contents
+        .iter_mut()
+        .flat_map(|(_, content)| {
+            debug_assert!(
+                content.original_source_map.len() <= 1,
+                "Expected at most one original source map per module, got: {:?}",
+                content.original_source_map
+            );
+            content.original_source_map.first().copied()
+        })
+        .collect();
+
+    Ok((merged_ast, comments, source_maps, original_source_maps))
 }
 
 // struct DisplayContextVisitor {
@@ -1596,7 +1631,7 @@ struct CodeGenResult {
     eval_context: Option<EvalContext>,
     is_esm: bool,
     generate_source_map: bool,
-    original_source_map: Option<ResolvedVc<Box<dyn GenerateSourceMap>>>,
+    original_source_map: SmallVec<[ResolvedVc<Box<dyn GenerateSourceMap>>; 1]>,
     minify: MinifyType,
     scope_hoisting_syntax_contexts:
         Option<FxIndexMap<ResolvedVc<Box<dyn EcmascriptChunkPlaceable + 'static>>, SyntaxContext>>,
@@ -1783,7 +1818,7 @@ async fn process_parse_result(
                 eval_context: Some(eval_context.into_owned()),
                 is_esm,
                 generate_source_map,
-                original_source_map,
+                original_source_map: original_source_map.into_iter().collect(),
                 minify,
                 scope_hoisting_syntax_contexts: retain_syntax_context.map(|(_, ctxts, _)| ctxts),
             })
@@ -1818,7 +1853,7 @@ async fn process_parse_result(
                         eval_context: None,
                         is_esm: false,
                         generate_source_map: false,
-                        original_source_map: None,
+                        original_source_map: smallvec![],
                         minify: MinifyType::NoMinify,
                         scope_hoisting_syntax_contexts: None,
                     }
@@ -1845,7 +1880,7 @@ async fn process_parse_result(
                         eval_context: None,
                         is_esm: false,
                         generate_source_map: false,
-                        original_source_map: None,
+                        original_source_map: smallvec![],
                         minify: MinifyType::NoMinify,
                         scope_hoisting_syntax_contexts: None,
                     }
@@ -1976,16 +2011,21 @@ async fn emit_content(
     }
 
     let source_map = if generate_source_map {
-        if let Some(original_source_map) = original_source_map {
-            Some(generate_js_source_map(
-                &*source_map,
-                mappings,
-                original_source_map.generate_source_map().await?.as_ref(),
-                true,
-            )?)
-        } else {
-            Some(generate_js_source_map(&*source_map, mappings, None, true)?)
-        }
+        println!(
+            "{} {:#?}",
+            unsafe { String::from_utf8_unchecked(bytes.clone()) },
+            mappings
+        );
+        Some(generate_js_source_map(
+            &*source_map,
+            mappings,
+            original_source_map
+                .iter()
+                .map(|map| map.generate_source_map())
+                .try_flat_join()
+                .await?,
+            true,
+        )?)
     } else {
         None
     };
@@ -2235,15 +2275,20 @@ impl SourceMapper for CodeGenResultSourceMap {
                 header_width,
                 source_maps,
             } => {
-                let (module, lo_lhs) =
+                let (module_lhs, lo_lhs) =
                     CodeGenResultComments::decode_bytepos(*header_width, sp_lhs.lo);
-                source_maps[module].merge_spans(
+                let (module_rhs, lo_rhs) =
+                    CodeGenResultComments::decode_bytepos(*header_width, sp_rhs.lo);
+                if module_lhs != module_rhs {
+                    return None;
+                }
+                source_maps[module_lhs].merge_spans(
                     Span {
                         lo: lo_lhs,
                         hi: CodeGenResultComments::decode_bytepos(*header_width, sp_lhs.hi).1,
                     },
                     Span {
-                        lo: CodeGenResultComments::decode_bytepos(*header_width, sp_rhs.lo).1,
+                        lo: lo_rhs,
                         hi: CodeGenResultComments::decode_bytepos(*header_width, sp_rhs.hi).1,
                     },
                 )
